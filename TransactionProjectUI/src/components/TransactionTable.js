@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Box, 
   Button, 
@@ -8,61 +8,48 @@ import {
   TableBody,
   TableCell, 
   TableRow,
+  TablePagination,
 } from '@mui/material';
 import TransactionModal from './TransactionModal';
+import IconButton from '@mui/material/IconButton';
+import DeleteIcon from '@mui/icons-material/Delete';
+import UpdateIcon from '@mui/icons-material/Update';
 
-export default function TransactionTable() {
-  // Modal
-  const [open, setOpen] = useState(false);
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
-  const handleSubmit = async (event) => {
-    console.log("POST transaction!")
-    event.preventDefault();
-    
-    const data = new FormData(event.currentTarget);
-    const value = data.get('value');
-    const destination = data.get('destination');
-    const note = data.get('note');
-    if ((value == "" || value == null) || (destination == "" || destination == null)) {
-      return;
-    }
-
-    fetch('https://b1haq4df0d.execute-api.us-east-2.amazonaws.com/dev/transaction', {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        value: value,
-        destination: destination,
-        note: note,
-      })
-    })
-    .catch((error) => console.log(`Error: ${error}`));
-    console.log(rows);
-    getTransactions();
-    console.log(rows);
-    handleClose();
+export default function TransactionTable(props) {
+  // Add Modal
+  const [openAdd, setOpenAdd] = useState(false);
+  const handleOpenAdd = () => setOpenAdd(true);
+  const handleCloseAdd = () => {
+    setOpenAdd(false);
+    props.refresh();
   };
+
+  // Update Modal
+  const [openUpdate, setOpenUpdate] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState(null);
+  const handleOpenUpdate = (entry) => {
+    setSelectedEntry(entry);
+    setOpenUpdate(true);
+  };
+  const handleCloseUpdate = () => {
+    setOpenUpdate(false);
+    props.refresh();
+  };
+
+  // Pagnition
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [page, setPage] = useState(0);
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+  // Avoid a layout jump when reaching the last page with empty rows.
+  const emptyRows =
+    page > 0 ? Math.max(0, (1 + page) * rowsPerPage - props.data.length) : 0;
   
-  // Data
-  const [rows, setRows] = useState([]);
-  const getTransactions = () => {
-    console.log("GET Transaction!")
-    fetch('https://b1haq4df0d.execute-api.us-east-2.amazonaws.com/dev', {
-      mode: 'cors'
-    })
-       .then((response) => response.json())
-       .then((data) => {
-          setRows(data.Response);
-       })
-       .catch((err) => {
-          console.log(err.message);
-       });
-  }
-  useEffect(() => getTransactions(), []);
   return (
     <>
       <Box
@@ -75,32 +62,78 @@ export default function TransactionTable() {
       <Typography component="h2" variant="h6" color="primary" gutterBottom>
         Transactions
       </Typography>
-        <Button variant="outlined" size="medium" onClick={handleOpen}>Add a new transaction</Button>
+        <Button variant="outlined" size="medium" onClick={handleOpenAdd}>Add a new transaction</Button>
       </Box>
-      <Table size="medium">
+      <Table 
+        sx={{ minWidth: 750 }}
+        size="medium"
+      >
         <TableHead>
           <TableRow>
-            <TableCell>ID</TableCell>
-            <TableCell>To</TableCell>
-            <TableCell>Note</TableCell>
-            <TableCell align="right">Value</TableCell>
+            <TableCell align='left'>ID</TableCell>
+            <TableCell align='left'>To</TableCell>
+            <TableCell align='left'>Note</TableCell>
+            <TableCell align='right'>Value</TableCell>
+            <TableCell align='right'></TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell>{row.id}</TableCell>
-              <TableCell>{row.destination}</TableCell>
-              <TableCell>{row.note}</TableCell>
-              <TableCell align="right">{`$${row.value}`}</TableCell>
+          {props.data && (rowsPerPage > 0 ? props.data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage) : props.data).map((entry, index) => (
+            <TableRow key={entry.id}>
+              <TableCell align='left'>{index + 1}</TableCell>
+              <TableCell align='left'>{entry.destination}</TableCell>
+              <TableCell align='left'>{entry.note}</TableCell>
+              <TableCell align='right'>{`$${entry.value}`}</TableCell>
+              <TableCell align='right'>
+                {
+                  <>
+                    <IconButton 
+                      aria-label="update" 
+                      onClick={() => handleOpenUpdate(entry)}
+                    >
+                      <UpdateIcon />
+                    </IconButton>
+                    <IconButton 
+                      aria-label="delete"
+                      onClick={async () => {
+                        await fetch(`https://b1haq4df0d.execute-api.us-east-2.amazonaws.com/dev/transaction/${entry.id}`, {
+                          method: 'DELETE',
+                          mode: 'cors',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                        });
+
+                        props.refresh();
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </>
+                }
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+      <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={props.data.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
+      <TransactionModal
+        data={null}
+        isOpen={openAdd}
+        handleClose={handleCloseAdd}
+      />
       <TransactionModal 
-        isOpen={open}
-        handleClose={handleClose}
-        handleSubmit={handleSubmit}
+        data={selectedEntry}
+        isOpen={openUpdate}
+        handleClose={handleCloseUpdate}
       />
     </>
   );

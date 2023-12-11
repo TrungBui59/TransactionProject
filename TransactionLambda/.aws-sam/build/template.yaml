@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'TransactionProject
+
+  Sample SAM Template for TransactionProject
+
+  '
+Globals:
+  Function:
+    Timeout: 20
+    MemorySize: 128
+Resources:
+  TransactionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TransactionFunction
+      Handler: transaction.App::handleRequest
+      Runtime: java11
+      Architectures:
+      - arm64
+      MemorySize: 512
+      Environment:
+        Variables:
+          PARAM1: VALUE
+          JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+          DB_URL: jdbc:mysql://database-1.cbyuffbwj2x4.us-east-2.rds.amazonaws.com:3306/TransactionApp
+          DB_USER: trungbui
+          DB_PASS: trungbui1234
+      Events:
+        CreateTransaction:
+          Type: Api
+          Properties:
+            Path: /transaction
+            Method: post
+        GetUserTransaction:
+          Type: Api
+          Properties:
+            Path: /transaction/{id}
+            Method: get
+        GetAllTransaction:
+          Type: Api
+          Properties:
+            Path: /
+            Method: get
+    Metadata:
+      SamResourceId: TransactionFunction
+Outputs:
+  TransactionApi:
+    Description: API Gateway endpoint URL for Prod stage for Hello World function
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/
+  TransactionFunction:
+    Description: Hello World Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - TransactionFunction
+      - Arn
+  TransactionFunctionIamRole:
+    Description: Implicit IAM Role created for Hello World function
+    Value:
+      Fn::GetAtt:
+      - TransactionFunctionRole
+      - Arn

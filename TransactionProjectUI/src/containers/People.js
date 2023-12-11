@@ -1,25 +1,46 @@
 import { useState, useEffect } from 'react';
 
 import {
+  Box,
+  Button, 
   Container,
   Grid,
   Card,
   CardContent,
-  Typography,
   CardHeader,
   Avatar,
   List,
   ListItem,
-  ListItemAvatar,
   Divider,
   ListItemText,
 } from '@mui/material/';
+import IconButton from '@mui/material/IconButton';
+import DeleteIcon from '@mui/icons-material/Delete';
+import UpdateIcon from '@mui/icons-material/Update';
+import UserModal from '../components/UserModal';
 
 const People = () => {
+  // Add Modal
+  const [openAdd, setOpenAdd] = useState(false);
+  const handleOpenAdd = () => setOpenAdd(true);
+  const handleCloseAdd = () => {
+    setOpenAdd(false);
+  }
+
+  // Update Modal
+  const [openUpdate, setOpenUpdate] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState(null);
+  const handleOpenUpdate = (entry) => {
+    setSelectedEntry(entry);
+    setOpenUpdate(true);
+  }
+  const handleCloseUpdate = () => {
+    setOpenUpdate(false);
+  }
+
   // Data
   const [people, setPeople] = useState([]);
   const getPeople = () => {
-    console.log("GET people!")
     fetch('https://b1haq4df0d.execute-api.us-east-2.amazonaws.com/dev/people', {
       mode: 'cors'
     })
@@ -30,23 +51,30 @@ const People = () => {
        .catch((err) => {
           console.log(err.message);
        });
-    // fetch('https://jia31dggl2.execute-api.us-east-2.amazonaws.com/dev/read_input', {
-    //   mode: 'cors',
-    //   'x-apiKey': 'lT4w53R8HB9AkUgPJ2Nhw8e7OLEF6sfg9t8x8HbL'
-    // })
-    //   .then((response) => response.json())
-    //   .then((data) => {
-    //     console.log(data);
-    //     console.log(data.products);
-    //   })
-    //   .catch((err) => {
-    //     console.log(err.message);
-    //   });
   }
-  useEffect(() => getPeople(), []);
+  useEffect(() => getPeople(), [openAdd, openUpdate]);
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          width: '100%',
+          justifyContent: 'flex-end',
+          paddingBottom: '10px',
+        }}
+      >
+        <Button 
+          variant="contained" 
+          size="large" 
+          onClick={handleOpenAdd}
+          sx={{
+
+          }}
+        >
+          Add a new user
+        </Button>
+      </Box>
       <Grid container spacing={4}>
         {people.map((person) => {
           // Random avatar background
@@ -59,7 +87,6 @@ const People = () => {
               <Card
                 sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                {}
                 <CardHeader
                   avatar={
                     <Avatar sx={{ bgcolor: "rgb(" + R + "," + G + "," + B + ")" }} aria-label="recipe">
@@ -69,6 +96,32 @@ const People = () => {
                   sx={{ paddingBottom: 0 }}
 
                   title={`${person.firstName != null ? person.firstName : ""} ${person.middleName != null ? person.middleName : ""} ${person.lastName}`}
+                  action={
+                    <>
+                    <IconButton 
+                      aria-label="update" 
+                      onClick={() => handleOpenUpdate(person)}
+                    >
+                      <UpdateIcon />
+                    </IconButton>
+                    <IconButton 
+                      aria-label="delete"
+                      onClick={async () => {
+                        await fetch(`https://b1haq4df0d.execute-api.us-east-2.amazonaws.com/dev/people/${person.email}`, {
+                          method: 'DELETE',
+                          mode: 'cors',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                        });
+
+                        getPeople();
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </>
+                  }
                 >
                 </CardHeader>
                 <CardContent sx={{ flexGrow: 1 }}>
@@ -91,7 +144,17 @@ const People = () => {
               </Card>
             </Grid>
           )})}
-          </Grid>
+        </Grid>
+        <UserModal
+          data={null}
+          isOpen={openAdd}
+          handleClose={handleCloseAdd}
+        />
+        <UserModal 
+          data={selectedEntry}
+          isOpen={openUpdate}
+          handleClose={handleCloseUpdate}
+        />
     </Container>
   );
 };

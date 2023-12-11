@@ -6,17 +6,21 @@ function preventDefault(event) {
   event.preventDefault();
 }
 
-export default function Deposits() {
+export default function Deposits(props) {
+  const currentDate = new Date();
+  const year = currentDate.getFullYear();
+  const month = currentDate.toLocaleString('default', { month: 'long'});
+  const day = currentDate.getDate();
   return (
     <React.Fragment>
       <Typography component="h2" variant="h6" color="primary" gutterBottom>
-        Recent Deposits
+        Total Transaction
       </Typography>
       <Typography component="p" variant="h4">
-        $3,024.00
+        ${props.total}
       </Typography>
       <Typography color="text.secondary" sx={{ flex: 1 }}>
-        on 15 March, 2019
+        {`on ${day} ${month}, ${year}`}
       </Typography>
       <div>
         <Link color="primary" href="#" onClick={preventDefault}>

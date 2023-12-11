@@ -20,8 +20,8 @@ import java.util.Map;
  */
 public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private final SessionFactory sessionFactory = createSessionFactory();
-    private SessionFactory createSessionFactory() {
+    private static final SessionFactory sessionFactory = createSessionFactory();
+    private static SessionFactory createSessionFactory() {
         try {
             // Configurations
             Map<String, Object> settings = new HashMap<>();
@@ -39,6 +39,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
 
             MetadataSources metadataSources = new MetadataSources(serviceRegistry);
             metadataSources.addAnnotatedClass(Transaction.class);
+            metadataSources.addAnnotatedClass(User.class);
             Metadata metadata = metadataSources.buildMetadata();
 
             return metadata.getSessionFactoryBuilder().build();
@@ -56,20 +57,83 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
                 .withHeaders(headers);
 
         Map<String, Object> body = new HashMap<>();
-        body.put("Response", "OK");
+        body.put("Response", "");
         try {
-            TransactionService service = new TransactionService(sessionFactory, new TransactionDAO());
+            Service service = new Service(sessionFactory, new DAO());
 
+            boolean isPeople = false;
+            Class<?> targetType;
             switch (input.getResource()) {
-                case "/":
-                    body.replace("Response", service.view());
-                    break;
+                case "/people":
+                    isPeople = true;
+
                 case "/transaction":
-                    body.replace("Response", service.createTransaction(fromJson(input.getBody(), Transaction.class)));
+                    targetType = (isPeople ? User.class : Transaction.class).asSubclass(Object.class);
+
+                    // Create a new transaction
+                    if (input.getHttpMethod().equalsIgnoreCase("POST")) {
+                        body.replace(
+                                "Response",
+                                service.create(fromJson(input.getBody(), targetType))
+                        );
+                    }
+
+                    // Read all transactions
+                    else if (input.getHttpMethod().equalsIgnoreCase("GET")) {
+                        body.replace(
+                                "Response",
+                                service.read(targetType)
+                        );
+                    }
+
+                    // Unknown method
+                    else {
+                        throw new RuntimeException("in parsing request: Unknown HTTP Method: " + input.getHttpMethod());
+                    }
+
                     break;
+
+                case "/people/{id}":
+                    isPeople = true;
                 case "/transaction/{id}":
-                    body.replace("Response", service.view(input.getPathParameters().get("id")));
+                    targetType = (isPeople ? User.class : Transaction.class).asSubclass(Object.class);
+
+                    // Read a transaction
+                    if (input.getHttpMethod().equalsIgnoreCase("GET")) {
+                        body.replace(
+                                "Response",
+                                service.read(input.getPathParameters().get("id"), targetType)
+                        );
+                    }
+
+                    // Update a transaction
+                    else if (input.getHttpMethod().equalsIgnoreCase("PUT")) {
+                        body.replace(
+                                "Response",
+                                service.update(
+                                        input.getPathParameters().get("id"),
+                                        fromJson(input.getBody(), targetType)
+                                )
+                        );
+                    }
+
+                    // Delete a transaction
+                    else if (input.getHttpMethod().equalsIgnoreCase("DELETE")) {
+                        body.replace(
+                                "Response",
+                                service.delete(input.getPathParameters().get("id"), targetType)
+                        );
+                    }
+
+                    // Unknown method
+                    else {
+                        throw new RuntimeException("in parsing request: Unknown HTTP Method: " + input.getHttpMethod());
+                    }
+
                     break;
+
+                default:
+                    throw new RuntimeException("in parsing request: Unknown Resource: " + input.getResource());
             }
 
             return response
@@ -77,7 +141,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
                     .withStatusCode(200);
 
         } catch (Exception e) {
-            body.replace("Response", "Error: " + e.getMessage());
+            body.replace("Response", "ERROR " + e.getMessage());
             return response
                     .withBody(toJson(body))
                     .withStatusCode(500);
